@@ -1,0 +1,53 @@
+import akka.actor.{Actor, ActorSystem, Props}
+
+
+// Define los mensajes que serán intercambiados entre los actores
+  case class EmitNumber(value: Int)
+
+  case class Subscribe(observer: ActorRef)
+
+  // Define un actor observable
+  class ObservableActor extends Actor {
+    private var observers: List[ActorRef] = List()
+
+    def receive: Receive = {
+      case Subscribe(observer) =>
+        observers = observer :: observers
+
+      case EmitNumber(value) =>
+        observers.foreach(_ ! value)
+    }
+  }
+
+  // Define un actor observador
+  class ObserverActor(name: String) extends Actor {
+    def receive: Receive = {
+      case value: Int =>
+        println(s"$name - Nuevo valor: $value")
+    }
+  }
+
+  // Crear un sistema de actores
+  val system = ActorSystem("ReactiveSystem")
+
+  // Crear instancias de los actores
+  val observableActor = system.actorOf(Props[ObservableActor], "observable")
+  val observer1 = system.actorOf(Props(new ObserverActor("Observer1")), "observer1")
+  val observer2 = system.actorOf(Props(new ObserverActor("Observer2")), "observer2")
+
+  // Suscribir los observadores al actor observable
+  observableActor ! Subscribe(observer1)
+  observableActor ! Subscribe(observer2)
+
+  // Emitir números desde el actor observable
+  observableActor ! EmitNumber(1)
+  observableActor ! EmitNumber(2)
+  observableActor ! EmitNumber(3)
+  observableActor ! EmitNumber(4)
+  observableActor ! EmitNumber(5)
+
+  // Esperar un tiempo suficiente para que se emitan los eventos
+  Thread.sleep(3000)
+
+  // Detener el sistema de actores
+  system.terminate()
