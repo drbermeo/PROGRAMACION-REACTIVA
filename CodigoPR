@@ -1,53 +1,46 @@
-import akka.actor.{Actor, ActorSystem, Props}
+import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 
+// Definición de Mensajes
+case class NuevoValor(value: Int)
+case object FinFlujo
+case object EmitirNumeros
 
-// Define los mensajes que serán intercambiados entre los actores
-  case class EmitNumber(value: Int)
-
-  case class Subscribe(observer: ActorRef)
-
-  // Define un actor observable
-  class ObservableActor extends Actor {
-    private var observers: List[ActorRef] = List()
-
-    def receive: Receive = {
-      case Subscribe(observer) =>
-        observers = observer :: observers
-
-      case EmitNumber(value) =>
-        observers.foreach(_ ! value)
-    }
+// Actor Observador
+class Observador extends Actor {
+  def receive: Receive = {
+    case NuevoValor(value) =>
+      println(s"Observador: Nuevo valor recibido: $value")
+    case FinFlujo =>
+      println("Observador: Fin del flujo")
+      context.system.terminate()
   }
+}
 
-  // Define un actor observador
-  class ObserverActor(name: String) extends Actor {
-    def receive: Receive = {
-      case value: Int =>
-        println(s"$name - Nuevo valor: $value")
-    }
+// Actor Emisor
+class Emisor(observer: ActorRef) extends Actor {
+  def receive: Receive = {
+    case EmitirNumeros =>
+      val numbers = 3 to 9
+      numbers.foreach(observer ! NuevoValor(_))
+      observer ! FinFlujo
   }
+}
 
-  // Crear un sistema de actores
-  val system = ActorSystem("ReactiveSystem")
 
-  // Crear instancias de los actores
-  val observableActor = system.actorOf(Props[ObservableActor], "observable")
-  val observer1 = system.actorOf(Props(new ObserverActor("Observer1")), "observer1")
-  val observer2 = system.actorOf(Props(new ObserverActor("Observer2")), "observer2")
+object reactive {
 
-  // Suscribir los observadores al actor observable
-  observableActor ! Subscribe(observer1)
-  observableActor ! Subscribe(observer2)
+    def main(args: Array[String]): Unit = {
+      // Crear el sistema de actores
+      val system = ActorSystem("ReactiveSystem")
 
-  // Emitir números desde el actor observable
-  observableActor ! EmitNumber(1)
-  observableActor ! EmitNumber(2)
-  observableActor ! EmitNumber(3)
-  observableActor ! EmitNumber(4)
-  observableActor ! EmitNumber(5)
+      // Crear el actor observador
+      val observador = system.actorOf(Props(classOf[Observador]), "observador")
 
-  // Esperar un tiempo suficiente para que se emitan los eventos
-  Thread.sleep(3000)
+      // Crear el actor emisor y pasarle el observador como referencia
+      val emisor = system.actorOf(Props(new Emisor(observador)), "emisor")
 
-  // Detener el sistema de actores
-  system.terminate()
+      // Iniciar el flujo de eventos
+      emisor ! EmitirNumeros
+    }
+}
+
